@@ -1,0 +1,81 @@
+package elasticsearchutil
+
+import (
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+
+	logger "github.com/kthomas/go-logger"
+	"gopkg.in/olivere/elastic.v6"
+)
+
+const defaultElasticsearchPort = 9200
+
+var (
+	// elasticClients is an array of configured elasticsearch clients
+	elasticClients []*elastic.Client
+
+	// elasticHosts is an array of <host>:<port> strings
+	elasticHosts []string
+
+	log *logger.Logger
+)
+
+func init() {
+	lvl := os.Getenv("ELASTICSEARCH_LOG_LEVEL")
+	if lvl == "" {
+		lvl = os.Getenv("ELASTICSEARCH_LOG_LEVEL")
+		if lvl == "" {
+			lvl = "INFO"
+		}
+	}
+	log = logger.NewLogger("go-redisutil", lvl, true)
+}
+
+// RequireElasticsearch reads the environment and initializes the configured elasticsearch client
+func RequireElasticsearch() {
+	elasticHosts = make([]string, 0)
+
+	if os.Getenv("ELASTICSEARCH_HOSTS") != "" {
+		hosts := strings.Split(os.Getenv("ELASTICSEARCH_HOSTS"), ",")
+		for _, host := range hosts {
+			elasticHosts = append(elasticHosts, strings.Trim(host, " "))
+		}
+	} else {
+		log.Panicf("failed to parse ELASTICSEARCH_HOSTS from environment")
+	}
+
+	requireElasticsearchConn()
+}
+
+func requireElasticsearchConn() {
+	elasticClients = make([]*elastic.Client, 0)
+
+	for _, host := range elasticHosts {
+		port := defaultElasticsearchPort
+		hostparts := strings.Split(host, ":")
+		if len(hostparts) == 2 {
+			parsedPort, err := strconv.Atoi(hostparts[1])
+			if err != nil {
+				log.Panicf("invalid port parsed during elasticsearch client configuration; %s", err.Error())
+			}
+			port = parsedPort
+		}
+
+		elasticURL := fmt.Sprintf("http://%s:%d", host, port)
+		client, err := elastic.NewClient(
+			elastic.SetURL(elasticURL),
+			elastic.SetSniff(false),
+			elastic.SetHealthcheck(true),
+		)
+
+		if err != nil {
+			log.Panicf("failed to open elasticsearch connection; %s", err.Error())
+		}
+
+		elasticClients = append(elasticClients, client)
+	}
+
+	log.Debugf("configured %d elasticsearch clients", len(elasticClients))
+}
