@@ -23,14 +23,23 @@ var (
 )
 
 func init() {
+	log = logger.NewLogger("bookie", getLogLevel(), getSyslogEndpoint())
+}
+
+func getLogLevel() string {
 	lvl := os.Getenv("ELASTICSEARCH_LOG_LEVEL")
 	if lvl == "" {
-		lvl = os.Getenv("ELASTICSEARCH_LOG_LEVEL")
-		if lvl == "" {
-			lvl = "INFO"
-		}
+		lvl = "info"
 	}
-	log = logger.NewLogger("go-redisutil", lvl, true)
+	return lvl
+}
+
+func getSyslogEndpoint() *string {
+	var endpoint *string
+	if os.Getenv("SYSLOG_ENDPOINT") != "" {
+		endpoint = stringOrNil(os.Getenv("SYSLOG_ENDPOINT"))
+	}
+	return endpoint
 }
 
 // RequireElasticsearch reads the environment and initializes the configured elasticsearch client
