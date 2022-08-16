@@ -23,7 +23,7 @@ var (
 )
 
 func init() {
-	log = logger.NewLogger("bookie", getLogLevel(), getSyslogEndpoint())
+	log = logger.NewLogger("elasticsearchutil", getLogLevel(), getSyslogEndpoint())
 }
 
 func getLogLevel() string {
