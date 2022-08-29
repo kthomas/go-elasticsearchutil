@@ -42,7 +42,7 @@ type MessageHeader struct {
 func NewIndexer() (indexer *Indexer) {
 	indexer = new(Indexer)
 
-	instanceID := uuid.NewV4()
+	instanceID, _ := uuid.NewV4()
 	indexer.identifier = base64.RawURLEncoding.EncodeToString(instanceID.Bytes())
 
 	indexer.flushMutex = &sync.Mutex{}
