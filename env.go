@@ -19,6 +19,15 @@ var (
 	// elasticHosts is an array of <host>:<port> strings
 	elasticHosts []string
 
+	// The elasticsearch timeout
+	elasticTimeout uint
+
+	// The maximum batch size in bytes for a single elasticsearch bulk index request
+	elasticMaxBatchSizeBytes int
+
+	// The maximum interval in milliseconds between elasticsearch bulk index requests
+	elasticMaxBatchInterval int
+
 	log *logger.Logger
 )
 
@@ -40,22 +49,6 @@ func getSyslogEndpoint() *string {
 		endpoint = stringOrNil(os.Getenv("SYSLOG_ENDPOINT"))
 	}
 	return endpoint
-}
-
-// RequireElasticsearch reads the environment and initializes the configured elasticsearch client
-func RequireElasticsearch() {
-	elasticHosts = make([]string, 0)
-
-	if os.Getenv("ELASTICSEARCH_HOSTS") != "" {
-		hosts := strings.Split(os.Getenv("ELASTICSEARCH_HOSTS"), ",")
-		for _, host := range hosts {
-			elasticHosts = append(elasticHosts, strings.Trim(host, " "))
-		}
-	} else {
-		log.Panicf("failed to parse ELASTICSEARCH_HOSTS from environment")
-	}
-
-	requireElasticsearchConn()
 }
 
 func requireElasticsearchConn() {
