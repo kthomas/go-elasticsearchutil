@@ -14,6 +14,7 @@ import (
 
 // Indexer instances buffer bulk indexing transactions
 type Indexer struct {
+	client           *elastic.Client
 	identifier       string
 	esBulkService    *elastic.BulkService
 	flushMutex       *sync.Mutex
@@ -21,7 +22,6 @@ type Indexer struct {
 	queueFlushTimer  *time.Timer
 	queueSizeInBytes int
 
-	// closing  uint32
 	shutdown chan bool
 }
 
@@ -45,6 +45,7 @@ func NewIndexer() (indexer *Indexer) {
 	instanceID, _ := uuid.NewV4()
 	indexer.identifier = base64.RawURLEncoding.EncodeToString(instanceID.Bytes())
 
+	indexer.client, _ = GetClient()
 	indexer.flushMutex = &sync.Mutex{}
 	indexer.q = make(chan *Message)
 
@@ -85,6 +86,7 @@ func (indexer *Indexer) Run() error {
 		case <-indexer.shutdown:
 			log.Debugf("closing indexer (%v) on Shutdown", indexer.identifier)
 			indexer.cleanup()
+			indexer.esBulkServiceFlush()
 			return nil
 		}
 	}
@@ -97,6 +99,7 @@ func (indexer *Indexer) Q(msg *Message) error {
 
 func (indexer *Indexer) cleanup() {
 	log.Debugf("cleaning up indexer (%v)", indexer.identifier)
+	indexer.queueFlushTimer.Stop()
 
 	log.Debugf("closing buffered queue for indexer (%v)", indexer.identifier)
 	close(indexer.q)
@@ -105,12 +108,7 @@ func (indexer *Indexer) cleanup() {
 }
 
 func (indexer *Indexer) setupBulkIndexer() error {
-	client, err := elastic.NewClient()
-	if err != nil {
-		return err
-	}
-
-	indexer.esBulkService = elastic.NewBulkService(client)
+	indexer.esBulkService = elastic.NewBulkService(indexer.client)
 	indexer.esBulkService.Timeout(fmt.Sprintf("%ds", elasticTimeout))
 	indexer.esBulkService.Pretty(false)
 
