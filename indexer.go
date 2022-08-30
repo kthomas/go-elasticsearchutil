@@ -9,7 +9,7 @@ import (
 	"time"
 
 	uuid "github.com/kthomas/go.uuid"
-	"gopkg.in/olivere/elastic.v6"
+	"github.com/olivere/elastic/v7"
 )
 
 // Indexer instances buffer bulk indexing transactions

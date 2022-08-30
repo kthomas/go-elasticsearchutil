@@ -4,7 +4,7 @@ import (
 	"os"
 
 	logger "github.com/kthomas/go-logger"
-	"gopkg.in/olivere/elastic.v6"
+	"github.com/olivere/elastic/v7"
 )
 
 const defaultElasticsearchPort = 9200
