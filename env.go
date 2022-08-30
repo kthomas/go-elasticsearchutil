@@ -26,6 +26,12 @@ var (
 	// The maximum interval in milliseconds between elasticsearch bulk index requests
 	elasticMaxBatchInterval int
 
+	// The username for basic authorization when communicating with elasticsearch
+	elasticUsername *string
+
+	// The password for basic authorization when communicating with elasticsearch
+	elasticPassword *string
+
 	log *logger.Logger
 )
 

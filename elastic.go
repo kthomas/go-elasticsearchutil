@@ -32,6 +32,14 @@ func RequireElasticsearch() {
 		log.Panicf("failed to parse ELASTICSEARCH_HOSTS from environment")
 	}
 
+	if os.Getenv("ELASTICSEARCH_USERNAME") != "" {
+		elasticUsername = stringOrNil(os.Getenv("ELASTICSEARCH_USERNAME"))
+	}
+
+	if os.Getenv("ELASTICSEARCH_PASSWORD") != "" {
+		elasticPassword = stringOrNil(os.Getenv("ELASTICSEARCH_PASSWORD"))
+	}
+
 	requireElasticsearchConn()
 }
 
@@ -58,11 +66,26 @@ func requireElasticsearchConn() {
 		if port != 80 && port != 443 {
 			elasticURL = fmt.Sprintf("%s:%d", elasticURL, port)
 		}
-		client, err := elastic.NewClient(
-			elastic.SetURL(elasticURL),
-			elastic.SetSniff(false),
-			elastic.SetHealthcheck(true),
-		)
+
+		var client *elastic.Client
+		var err error
+
+		basicAuthConfigured := elasticUsername != nil && elasticPassword != nil
+
+		if !basicAuthConfigured {
+			client, err = elastic.NewClient(
+				elastic.SetURL(elasticURL),
+				elastic.SetSniff(false),
+				elastic.SetHealthcheck(true),
+			)
+		} else {
+			client, err = elastic.NewClient(
+				elastic.SetURL(elasticURL),
+				elastic.SetSniff(false),
+				elastic.SetHealthcheck(true),
+				elastic.SetBasicAuth(*elasticUsername, *elasticPassword),
+			)
+		}
 
 		if err != nil {
 			log.Panicf("failed to open elasticsearch connection; %s", err.Error())
