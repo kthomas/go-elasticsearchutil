@@ -58,6 +58,7 @@ func NewIndexer() (indexer *Indexer) {
 	return indexer
 }
 
+// Run the indexer instance
 func (indexer *Indexer) Run() error {
 	log.Infof("running elasticsearch indexer instance %v", indexer.identifier)
 
@@ -90,6 +91,11 @@ func (indexer *Indexer) Run() error {
 			return nil
 		}
 	}
+}
+
+// Stop the indexer instance
+func (indexer *Indexer) Stop() {
+	indexer.shutdown <- true
 }
 
 // Q enqueues the given message for inclusion in the bulk indexing process
