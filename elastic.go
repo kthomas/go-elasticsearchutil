@@ -2,7 +2,9 @@ package elasticsearchutil
 
 import (
 	"errors"
+	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"gopkg.in/olivere/elastic.v6"
@@ -31,4 +33,40 @@ func RequireElasticsearch() {
 	}
 
 	requireElasticsearchConn()
+}
+
+func requireElasticsearchConn() {
+	elasticClients = make([]*elastic.Client, 0)
+
+	for _, host := range elasticHosts {
+		port := defaultElasticsearchPort
+		hostparts := strings.Split(host, ":")
+		if len(hostparts) == 2 {
+			parsedPort, err := strconv.Atoi(hostparts[1])
+			if err != nil {
+				log.Panicf("invalid port parsed during elasticsearch client configuration; %s", err.Error())
+			}
+			port = parsedPort
+		}
+
+		scheme := defaultElasticsearchScheme
+		if port == 443 {
+			scheme = "https"
+		}
+
+		elasticURL := fmt.Sprintf("%s://%s:%d", scheme, host, port)
+		client, err := elastic.NewClient(
+			elastic.SetURL(elasticURL),
+			elastic.SetSniff(false),
+			elastic.SetHealthcheck(true),
+		)
+
+		if err != nil {
+			log.Panicf("failed to open elasticsearch connection; %s", err.Error())
+		}
+
+		elasticClients = append(elasticClients, client)
+	}
+
+	log.Debugf("configured %d elasticsearch clients", len(elasticClients))
 }

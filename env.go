@@ -1,16 +1,14 @@
 package elasticsearchutil
 
 import (
-	"fmt"
 	"os"
-	"strconv"
-	"strings"
 
 	logger "github.com/kthomas/go-logger"
 	"gopkg.in/olivere/elastic.v6"
 )
 
 const defaultElasticsearchPort = 9200
+const defaultElasticsearchScheme = "http"
 
 var (
 	// elasticClients is an array of configured elasticsearch clients
@@ -49,35 +47,4 @@ func getSyslogEndpoint() *string {
 		endpoint = stringOrNil(os.Getenv("SYSLOG_ENDPOINT"))
 	}
 	return endpoint
-}
-
-func requireElasticsearchConn() {
-	elasticClients = make([]*elastic.Client, 0)
-
-	for _, host := range elasticHosts {
-		port := defaultElasticsearchPort
-		hostparts := strings.Split(host, ":")
-		if len(hostparts) == 2 {
-			parsedPort, err := strconv.Atoi(hostparts[1])
-			if err != nil {
-				log.Panicf("invalid port parsed during elasticsearch client configuration; %s", err.Error())
-			}
-			port = parsedPort
-		}
-
-		elasticURL := fmt.Sprintf("http://%s:%d", host, port)
-		client, err := elastic.NewClient(
-			elastic.SetURL(elasticURL),
-			elastic.SetSniff(false),
-			elastic.SetHealthcheck(true),
-		)
-
-		if err != nil {
-			log.Panicf("failed to open elasticsearch connection; %s", err.Error())
-		}
-
-		elasticClients = append(elasticClients, client)
-	}
-
-	log.Debugf("configured %d elasticsearch clients", len(elasticClients))
 }
