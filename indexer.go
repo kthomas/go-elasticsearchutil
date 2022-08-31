@@ -12,6 +12,9 @@ import (
 	"github.com/olivere/elastic/v7"
 )
 
+const defaultElasticsearchIndexerBufferedChannelSize = 64
+const defaultElasticsearchIndexerSleepIntervalMillis = 1000
+
 // Indexer instances buffer bulk indexing transactions
 type Indexer struct {
 	client           *elastic.Client
@@ -19,8 +22,9 @@ type Indexer struct {
 	esBulkService    *elastic.BulkService
 	flushMutex       *sync.Mutex
 	q                chan *Message
-	queueFlushTimer  *time.Timer
+	queueFlushTicker *time.Ticker
 	queueSizeInBytes int
+	sleepInterval    time.Duration
 
 	shutdown chan bool
 }
@@ -47,11 +51,10 @@ func NewIndexer() (indexer *Indexer) {
 
 	indexer.client, _ = GetClient()
 	indexer.flushMutex = &sync.Mutex{}
-	indexer.q = make(chan *Message)
+	indexer.q = make(chan *Message, defaultElasticsearchIndexerBufferedChannelSize)
 
 	indexer.queueSizeInBytes = 0
-	indexer.queueFlushTimer = time.NewTimer(time.Second * time.Duration(elasticMaxBatchInterval))
-	indexer.queueFlushTimer.Stop()
+	indexer.sleepInterval = time.Millisecond * time.Duration(defaultElasticsearchIndexerSleepIntervalMillis)
 
 	indexer.setupBulkIndexer()
 
@@ -61,6 +64,7 @@ func NewIndexer() (indexer *Indexer) {
 // Run the indexer instance
 func (indexer *Indexer) Run() error {
 	log.Infof("running elasticsearch indexer instance %v", indexer.identifier)
+	indexer.queueFlushTicker = time.NewTicker(time.Second * time.Duration(elasticMaxBatchInterval))
 
 	for {
 		select {
@@ -77,10 +81,10 @@ func (indexer *Indexer) Run() error {
 				}
 			} else {
 				log.Debug("closed consumer channel")
-				return nil
+				// return nil
 			}
 
-		case t := <-indexer.queueFlushTimer.C:
+		case t := <-indexer.queueFlushTicker.C:
 			log.Debugf("indexer (%v) queue flush timer invoked at %v", indexer.identifier, t)
 			indexer.esBulkServiceFlush()
 
@@ -89,6 +93,9 @@ func (indexer *Indexer) Run() error {
 			indexer.cleanup()
 			indexer.esBulkServiceFlush()
 			return nil
+
+		default:
+			time.Sleep(indexer.sleepInterval)
 		}
 	}
 }
@@ -100,12 +107,13 @@ func (indexer *Indexer) Stop() {
 
 // Q enqueues the given message for inclusion in the bulk indexing process
 func (indexer *Indexer) Q(msg *Message) error {
-	return indexer.index(msg)
+	indexer.q <- msg
+	return nil
 }
 
 func (indexer *Indexer) cleanup() {
 	log.Debugf("cleaning up indexer (%v)", indexer.identifier)
-	indexer.queueFlushTimer.Stop()
+	indexer.queueFlushTicker.Stop()
 
 	log.Debugf("closing buffered queue for indexer (%v)", indexer.identifier)
 	close(indexer.q)
@@ -124,7 +132,7 @@ func (indexer *Indexer) setupBulkIndexer() error {
 func (indexer *Indexer) index(msg *Message) error {
 	if indexer.queueSizeInBytes == 0 {
 		log.Debugf("indexer (%v) queue is currently empty, resetting queue flush timer", indexer.identifier)
-		indexer.queueFlushTimer.Reset(time.Second * time.Duration(elasticMaxBatchInterval))
+		indexer.queueFlushTicker.Reset(time.Second * time.Duration(elasticMaxBatchInterval))
 	}
 
 	if msg.Header == nil {
