@@ -62,7 +62,7 @@ func requireElasticsearchConn() {
 			scheme = "https"
 		}
 
-		elasticURL := fmt.Sprintf("%s://%s", scheme, host)
+		elasticURL := fmt.Sprintf("%s://%s", scheme, hostparts[0])
 		if port != 80 && port != 443 {
 			elasticURL = fmt.Sprintf("%s:%d", elasticURL, port)
 		}
