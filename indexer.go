@@ -13,6 +13,8 @@ import (
 )
 
 const defaultElasticsearchIndexerBufferedChannelSize = 64
+const defaultElasticsearchIndexerMaxBatchIntervalMillis = 10000
+const defaultElasticsearchIndexerMaxBatchSizeBytes = 1024 * 10
 const defaultElasticsearchIndexerSleepIntervalMillis = 1000
 
 // Indexer instances buffer bulk indexing transactions
@@ -64,7 +66,7 @@ func NewIndexer() (indexer *Indexer) {
 // Run the indexer instance
 func (indexer *Indexer) Run() error {
 	log.Infof("running elasticsearch indexer instance %v", indexer.identifier)
-	indexer.queueFlushTicker = time.NewTicker(time.Second * time.Duration(elasticMaxBatchInterval))
+	indexer.queueFlushTicker = time.NewTicker(time.Millisecond * time.Duration(defaultElasticsearchIndexerMaxBatchIntervalMillis))
 
 	for {
 		select {
@@ -132,7 +134,7 @@ func (indexer *Indexer) setupBulkIndexer() error {
 func (indexer *Indexer) index(msg *Message) error {
 	if indexer.queueSizeInBytes == 0 {
 		log.Debugf("indexer (%v) queue is currently empty, resetting queue flush timer", indexer.identifier)
-		indexer.queueFlushTicker.Reset(time.Second * time.Duration(elasticMaxBatchInterval))
+		indexer.queueFlushTicker.Reset(time.Millisecond * time.Duration(defaultElasticsearchIndexerMaxBatchIntervalMillis))
 	}
 
 	if msg.Header == nil {
@@ -153,8 +155,8 @@ func (indexer *Indexer) index(msg *Message) error {
 	log.Debugf("attempting to index %d-byte %v document in index %v: %v", size, docType, index, msg)
 
 	log.Debugf("current size of indexer (%v) queue size in bytes: %d", indexer.identifier, indexer.queueSizeInBytes)
-	if indexer.queueSizeInBytes+size >= elasticMaxBatchSizeBytes {
-		log.Debugf("adding %d-byte %v document would exceed configured max %d-byte batch size", size, docType, elasticMaxBatchSizeBytes)
+	if indexer.queueSizeInBytes+size >= defaultElasticsearchIndexerMaxBatchSizeBytes {
+		log.Debugf("adding %d-byte %v document would exceed configured max %d-byte batch size", size, docType, defaultElasticsearchIndexerMaxBatchSizeBytes)
 		indexer.esBulkServiceFlush()
 	}
 
