@@ -179,7 +179,7 @@ func (indexer *Indexer) esBulkServiceFlush() (*elastic.BulkResponse, error) {
 	indexer.queueSizeInBytes = 0
 	if indexer.esBulkService.NumberOfActions() == 0 {
 		msg := fmt.Sprintf("indexer (%v) attempted to send Elasticsearch bulk index request, but nothing was queued", indexer.identifier)
-		log.Warning(msg)
+		log.Debugf(msg)
 		return nil, errors.New(msg)
 	}
 
