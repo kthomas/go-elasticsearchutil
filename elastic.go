@@ -1,8 +1,10 @@
 package elasticsearchutil
 
 import (
+	"crypto/tls"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -40,6 +42,14 @@ func RequireElasticsearch() {
 		elasticPassword = stringOrNil(os.Getenv("ELASTICSEARCH_PASSWORD"))
 	}
 
+	if os.Getenv("ELASTICSEARCH_API_SCHEME") != "" {
+		elasticAPIScheme = stringOrNil(os.Getenv("ELASTICSEARCH_API_SCHEME"))
+	}
+
+	if os.Getenv("ELASTICSEARCH_ACCEPT_SELF_SIGNED_CERTIFICATE") != "" {
+		elasticAcceptSelfSignedCertificate = strings.EqualFold(strings.ToLower(os.Getenv("ELASTICSEARCH_ACCEPT_SELF_SIGNED_CERTIFICATE")), "true")
+	}
+
 	requireElasticsearchConn()
 }
 
@@ -58,7 +68,9 @@ func requireElasticsearchConn() {
 		}
 
 		scheme := defaultElasticsearchScheme
-		if port == 443 {
+		if elasticAPIScheme != nil {
+			scheme = *elasticAPIScheme
+		} else if port == 443 {
 			scheme = "https"
 		}
 
@@ -72,14 +84,28 @@ func requireElasticsearchConn() {
 
 		basicAuthConfigured := elasticUsername != nil && elasticPassword != nil
 
+		var httpTransport *http.Transport
+		if strings.EqualFold(scheme, "https") {
+			httpTransport = &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: true,
+				},
+			}
+		}
+		httpClient := &http.Client{
+			Transport: httpTransport,
+		}
+
 		if !basicAuthConfigured {
 			client, err = elastic.NewClient(
+				elastic.SetHttpClient(httpClient),
 				elastic.SetURL(elasticURL),
 				elastic.SetSniff(false),
 				elastic.SetHealthcheck(true),
 			)
 		} else {
 			client, err = elastic.NewClient(
+				elastic.SetHttpClient(httpClient),
 				elastic.SetURL(elasticURL),
 				elastic.SetSniff(false),
 				elastic.SetHealthcheck(true),

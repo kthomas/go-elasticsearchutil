@@ -20,6 +20,12 @@ var (
 	// The elasticsearch timeout
 	elasticTimeout uint
 
+	// The API scheme, i.e., 'https', to force the elasticsearch client to use for new connections
+	elasticAPIScheme *string
+
+	// When true, self-signed certificates are accepted when connecting to elasticsearch via https
+	elasticAcceptSelfSignedCertificate bool
+
 	// The maximum batch size in bytes for a single elasticsearch bulk index request
 	elasticMaxBatchSizeBytes int
 
