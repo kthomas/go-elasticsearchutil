@@ -87,11 +87,11 @@ func (indexer *Indexer) Run() error {
 			}
 
 		case t := <-indexer.queueFlushTicker.C:
-			log.Debugf("indexer (%v) queue flush timer invoked at %v", indexer.identifier, t)
+			log.Tracef("indexer (%v) queue flush timer invoked at %v", indexer.identifier, t)
 			indexer.esBulkServiceFlush()
 
 		case <-indexer.shutdown:
-			log.Debugf("closing indexer (%v) on Shutdown", indexer.identifier)
+			log.Debugf("shutting down indexer (%v)", indexer.identifier)
 			indexer.cleanup()
 			indexer.esBulkServiceFlush()
 			return nil
@@ -152,9 +152,10 @@ func (indexer *Indexer) index(msg *Message) error {
 	size := len(msg.Payload)
 	docType := msg.Header.DocType
 	index := msg.Header.Index
-	log.Debugf("attempting to index %d-byte %v document in index %v: %v", size, docType, index, msg)
 
-	log.Debugf("current size of indexer (%v) queue size in bytes: %d", indexer.identifier, indexer.queueSizeInBytes)
+	log.Tracef("attempting to index %d-byte %v document in index %v: %v", size, docType, index, msg)
+	log.Tracef("current bulk queue size of indexer (%v) in bytes: %d", indexer.identifier, indexer.queueSizeInBytes)
+
 	if indexer.queueSizeInBytes+size >= defaultElasticsearchIndexerMaxBatchSizeBytes {
 		log.Debugf("adding %d-byte %v document would exceed configured max %d-byte batch size", size, docType, defaultElasticsearchIndexerMaxBatchSizeBytes)
 		indexer.esBulkServiceFlush()
@@ -179,7 +180,7 @@ func (indexer *Indexer) esBulkServiceFlush() (*elastic.BulkResponse, error) {
 	indexer.queueSizeInBytes = 0
 	if indexer.esBulkService.NumberOfActions() == 0 {
 		msg := fmt.Sprintf("indexer (%v) attempted to send Elasticsearch bulk index request, but nothing was queued", indexer.identifier)
-		log.Debugf(msg)
+		log.Tracef(msg)
 		return nil, errors.New(msg)
 	}
 
@@ -190,17 +191,17 @@ func (indexer *Indexer) esBulkServiceFlush() (*elastic.BulkResponse, error) {
 		// in some cases, we will want to requeue the reconstituted message (i.e. ES connection timeout)...
 		// and in other cases, we will want to reject the message and not requeue it (i.e. bad request).
 	} else {
-		log.Infof("elasticsearch bulk index of %d items succeeded in %d ms", len(response.Items), response.Took)
-		log.Debugf("elasticsearch bulk index response items: %v", response.Items)
+		log.Debugf("indexer (%v) successfully indexed %d items in %dms via bulk request", len(response.Items), response.Took)
+		log.Tracef("elasticsearch bulk index response items: %v", response.Items)
 
 		for _, item := range response.Succeeded() {
 			messageId := item.Id
 			docType := item.Type
-			log.Debugf("elasticsearch bulk indexer indexed %v document with id: %v", docType, messageId)
+			log.Tracef("indexer (%v) indexed %v document with id: %v", indexer.identifier, docType, messageId)
 		}
 
 		for _, item := range response.Failed() {
-			log.Debugf("elasticsearch bulk indexer document failed indexing: %v", item.Error)
+			log.Warningf("indexer (%v) failed to index document in bulk request; %v", item.Error)
 		}
 	}
 
