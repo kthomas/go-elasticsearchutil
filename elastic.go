@@ -85,7 +85,7 @@ func requireElasticsearchConn() {
 		basicAuthConfigured := elasticUsername != nil && elasticPassword != nil
 
 		var httpTransport *http.Transport
-		if strings.EqualFold(scheme, "https") {
+		if strings.EqualFold(scheme, "https") && elasticAcceptSelfSignedCertificate {
 			httpTransport = &http.Transport{
 				TLSClientConfig: &tls.Config{
 					InsecureSkipVerify: true,
