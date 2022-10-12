@@ -39,9 +39,8 @@ type Message struct {
 
 // MessageHeader allows metadata about the payload to be provided; this metadata contains parameters related to elasticsearch
 type MessageHeader struct {
-	DocType *string `json:"doc_type,omitempty"`
-	ID      *string `json:"id,omitempty"`
-	Index   *string `json:"index,omitempty"`
+	ID    *string `json:"id,omitempty"`
+	Index *string `json:"index,omitempty"`
 }
 
 // NewIndexer convenience method to initialize a new in-memory `Indexer` instance
@@ -74,8 +73,8 @@ func (indexer *Indexer) Run() error {
 			if ok {
 				log.Debugf("received %d-byte delivery on inbound channel for indexer: %s", len(msg.Payload), indexer.identifier)
 
-				if msg.Header.DocType != nil && msg.Header.Index != nil {
-					log.Debugf("attempting to index %d-byte %s document delivered for index %s", len(msg.Payload), *msg.Header.DocType, *msg.Header.Index)
+				if msg.Header.Index != nil {
+					log.Debugf("attempting to index %d-byte document delivered for index %s", len(msg.Payload), *msg.Header.Index)
 					indexer.index(msg)
 				} else {
 					log.Warningf("skipped indexing %d-byte document delivered with invalid headers", len(msg.Payload))
@@ -141,27 +140,22 @@ func (indexer *Indexer) index(msg *Message) error {
 		return fmt.Errorf("failed to index %d-byte message; no header provided", len(msg.Payload))
 	}
 
-	if msg.Header.DocType == nil {
-		return fmt.Errorf("failed to index %d-byte message; no doc_type provided in header", len(msg.Payload))
-	}
-
 	if msg.Header.Index == nil {
 		return fmt.Errorf("failed to index %d-byte message; no index provided in header", len(msg.Payload))
 	}
 
 	size := len(msg.Payload)
-	docType := msg.Header.DocType
 	index := msg.Header.Index
 
-	log.Tracef("attempting to index %d-byte %v document in index %v: %v", size, docType, index, msg)
+	log.Tracef("attempting to index %d-byte %v document in index %v: %v", size, index, msg)
 	log.Tracef("current bulk queue size of indexer (%v) in bytes: %d", indexer.identifier, indexer.queueSizeInBytes)
 
 	if indexer.queueSizeInBytes+size >= defaultElasticsearchIndexerMaxBatchSizeBytes {
-		log.Debugf("adding %d-byte %v document would exceed configured max %d-byte batch size", size, docType, defaultElasticsearchIndexerMaxBatchSizeBytes)
+		log.Debugf("adding %d-byte %v document would exceed configured max %d-byte batch size", size, defaultElasticsearchIndexerMaxBatchSizeBytes)
 		indexer.esBulkServiceFlush()
 	}
 
-	req := elastic.NewBulkIndexRequest().Index(*index).Type(*docType).Doc(string(msg.Payload))
+	req := elastic.NewBulkIndexRequest().Index(*index).Doc(string(msg.Payload))
 	if msg.Header.ID != nil {
 		req.Id(*msg.Header.ID)
 	}
